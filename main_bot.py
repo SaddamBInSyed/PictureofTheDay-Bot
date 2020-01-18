@@ -24,6 +24,7 @@ est_timezone = timezone('US/Eastern')
 from tinydb import TinyDB, Query
 main_potd_db = TinyDB('main_potd_db.json')
 old_potd_db = TinyDB('old_potd_db.json')
+from tinydb.operations import increment
 
 # Datetime Parser
 from dateutil.parser import parse
@@ -112,16 +113,17 @@ def pictureoftheday_message(bot, update):
         # If more than 10 minutes have passed, they can reuse the command
         if int(minutes_diff) >= 0:
             main_potd_db.upsert({'time': str(datetime.now(est_timezone).strftime(fmt)), 'username': str(update.message.from_user.username)}, Query()['chat_id'] == update.message.chat_id)
+            main_potd_db.update(increment('count'), Query()['chat_id'] == update.message.chat_id)
 
             nasa_data = requests.get(nasa_url).json()
 
             if 'image' in nasa_data['media_type']:
-                send_information_to_user(bot, update.message.chat_id, nasa_data['title'], nasa_data['hdurl'], nasa_data['explanation'])
+                send_information_to_user(bot, update.message.chat_id, nasa_data['title'], nasa_data['url'], nasa_data['explanation'])
                 bot.send_message(chat_id = update.message.chat_id, text = '<b> NEW! </b> You can now access old pictures of the day! Type for example: <code> /old_picture {} </code>'.format(randomize_date), parse_mode = 'HTML')
                 print("User {} and ID {} called the /picture command!".format(update.message.chat_id, str(update.message.from_user.username)))
             
             elif 'video' in nasa_data['media_type']:
-                send_information_to_user(bot, update.message.chat_id, nasa_data['title'], nasa_data['hdurl'], nasa_data['explanation'])
+                send_information_to_user(bot, update.message.chat_id, nasa_data['title'], nasa_data['url'], nasa_data['explanation'])
                 bot.send_message(chat_id = update.message.chat_id, text = '<b> NEW! </b> You can now access old pictures of the day! Type for example: <code> /old_picture {} </code>'.format(randomize_date), parse_mode = 'HTML')
                 print("User {} and ID {} called the /picture command!".format(update.message.chat_id, str(update.message.from_user.username)))
             
@@ -135,7 +137,7 @@ def pictureoftheday_message(bot, update):
 
     # A new user has invoked the picture command since the chat_id cannot be found in database
     else:
-        main_potd_db.insert({'chat_id': update.message.chat_id, 'time': str(datetime.now(est_timezone).strftime(fmt)), 'username': update.message.from_user.username})
+        main_potd_db.insert({'chat_id': update.message.chat_id, 'time': str(datetime.now(est_timezone).strftime(fmt)), 'username': update.message.from_user.username, 'count': 1})
 
         nasa_data = requests.get(nasa_url).json()
 
@@ -191,12 +193,13 @@ def old_picture(bot, update, args):
 
                 if int(minutes_diff) >= 0:
                     old_potd_db.upsert({'time': str(datetime.now(est_timezone).strftime(fmt)), 'username': str(update.message.from_user.username)}, Query()['chat_id'] == update.message.chat_id)
+                    old_potd_db.update(increment('count'), Query()['chat_id'] == update.message.chat_id)
 
                     old_pictures_url = 'https://api.nasa.gov/planetary/apod?api_key={}&date={}-{}-{}'.format(config.api_key, year, month, day)
                     old_picture_data = requests.get(old_pictures_url).json()
 
                     if 'image' in old_picture_data['media_type']:
-                        send_information_to_user(bot, update.message.chat_id, old_picture_data['title'], old_picture_data['hdurl'], old_picture_data['explanation'])
+                        send_information_to_user(bot, update.message.chat_id, old_picture_data['title'], old_picture_data['url'], old_picture_data['explanation'])
                         print("A user {} and ID {} called the /old_picture command!".format(update.message.chat_id, str(update.message.from_user.username)))
                     
                     elif 'video' in old_picture_data['media_type']:
@@ -213,13 +216,13 @@ def old_picture(bot, update, args):
 
             else:
 
-                old_potd_db.insert({'chat_id': update.message.chat_id, 'time': str(datetime.now(est_timezone).strftime(fmt)), 'username': update.message.from_user.username})
+                old_potd_db.insert({'chat_id': update.message.chat_id, 'time': str(datetime.now(est_timezone).strftime(fmt)), 'username': update.message.from_user.username, 'count': 1})
 
                 old_pictures_url = 'https://api.nasa.gov/planetary/apod?api_key={}&date={}-{}-{}'.format(config.api_key, year, month, day)
                 old_picture_data = requests.get(old_pictures_url).json()
 
                 if 'image' in old_picture_data['media_type']:                
-                    send_information_to_user(bot, update.message.chat_id, old_picture_data['title'], old_picture_data['hdurl'], old_picture_data['explanation'])
+                    send_information_to_user(bot, update.message.chat_id, old_picture_data['title'], old_picture_data['url'], old_picture_data['explanation'])
                     print("A user {} and ID {} called the /old_picture command!".format(update.message.chat_id, str(update.message.from_user.username)))
                 
                 elif 'video' in old_picture_data['media_type']:
